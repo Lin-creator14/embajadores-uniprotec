@@ -1,2 +1,3 @@
-salida/
+salida/*
+!salida/escalera_uniprotec_tiktok.mp4
 __pycache__/
