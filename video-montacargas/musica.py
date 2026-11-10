@@ -5,6 +5,7 @@ Progresión I–V–vi–IV en Re mayor, 100 BPM: pad suave + arpegio pluck + pu
 Genera audio/musica.wav (~41 s) con fundidos de entrada y salida.
 """
 import os
+import sys
 import wave
 
 import numpy as np
@@ -12,7 +13,7 @@ import numpy as np
 SR = 44100
 BPM = 100
 BEAT = 60 / BPM
-DUR = 41.0
+DUR = float(sys.argv[1]) if len(sys.argv) > 1 else 41.0
 AQUI = os.path.dirname(os.path.abspath(__file__))
 
 N = int(SR * DUR)
@@ -106,7 +107,7 @@ out *= 0.8
 st = np.stack([out, np.roll(out, int(0.012 * SR))], axis=1)  # ligera amplitud estéreo
 pcm = (st * 32767).astype(np.int16)
 
-dest = os.path.join(AQUI, "audio", "musica.wav")
+dest = sys.argv[2] if len(sys.argv) > 2 else os.path.join(AQUI, "audio", "musica.wav")
 with wave.open(dest, "wb") as w:
     w.setnchannels(2)
     w.setsampwidth(2)
