@@ -74,13 +74,56 @@ TOMAS = [
 CORTES_FLASH = {T["Liderazgo"], T["Growth"], T["LEGO"]}  # destello blanco al presentar cada curso
 
 
+DIFUMINAR_ROSTROS = True
+MODELO_ROSTROS = os.path.join(AQUI, "modelos", "face_detection_yunet_2023mar.onnx")  # OpenCV Zoo, Apache-2.0
+
+
+UMBRAL = 0.62
+
+
+def anonimizar(frames, n):
+    """Detecta rostros (YuNet) y los difumina con una elipse suave, estable en el tiempo."""
+    import cv2
+    cache = os.path.join(AQUI, "salida", f"rostros_toma{n}.json")
+    if os.path.exists(cache):
+        todas = json.load(open(cache))
+    else:
+        det = cv2.FaceDetectorYN.create(MODELO_ROSTROS, "", (W // 2, H // 2), 0.4, 0.3, 5000)
+        todas = []
+        for fr in frames:
+            small = cv2.resize(fr, (W // 2, H // 2))
+            _, caras = det.detect(cv2.cvtColor(small, cv2.COLOR_RGB2BGR))
+            todas.append([] if caras is None else [[float(v) for v in c[:4] * 2] + [float(c[-1])] for c in caras])
+        os.makedirs(os.path.dirname(cache), exist_ok=True)
+        json.dump(todas, open(cache, "w"))
+    # solo detecciones confiables y de tamaño de rostro razonable
+    cajas = [[tuple(c[:4]) for c in f if c[4] >= UMBRAL and 0.6 < c[3] / max(c[2], 1) < 2.2 and c[2] < W * 0.4]
+             for f in todas]
+    out = frames.copy()
+    VENT = 5  # unión de detecciones de ±5 fotogramas (evita parpadeos y huecos)
+    for i in range(len(frames)):
+        bs = [b for j in range(max(0, i - VENT), min(len(frames), i + VENT + 1)) for b in cajas[j]]
+        if not bs:
+            continue
+        fr = out[i]
+        blur = cv2.GaussianBlur(fr, (0, 0), 28)
+        mask = np.zeros((H, W), np.float32)
+        for x, y, bw, bh in bs:
+            cx, cy = x + bw / 2, y + bh / 2 - bh * 0.1
+            cv2.ellipse(mask, (int(cx), int(cy)), (int(bw * 0.85), int(bh * 1.0)), 0, 0, 360, 1.0, -1)
+        mask = cv2.GaussianBlur(mask, (0, 0), 12)[..., None]
+        out[i] = (fr * (1 - mask) + blur * mask).astype(np.uint8)
+    return out
+
+
 def cargar(n):
     src = os.path.join(AQUI, "clips", f"toma{n}.mov")
     vf = (f"fps={FPS},hqdn3d=1.5:1.5:3:3,scale={W}:{H}:flags=lanczos,"
           f"unsharp=5:5:0.8:3:3:0.3,eq=contrast=1.06:saturation=1.18:brightness=0.015,setsar=1")
     raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", src, "-an", "-vf", vf, "-f", "rawvideo",
                           "-pix_fmt", "rgb24", "-"], capture_output=True, check=True).stdout
-    return np.frombuffer(raw, np.uint8).reshape(-1, H, W, 3)
+    frames = np.frombuffer(raw, np.uint8).reshape(-1, H, W, 3)
+    return anonimizar(frames, n) if DIFUMINAR_ROSTROS else frames
 
 
 CLIPS = {}

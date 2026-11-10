@@ -30,6 +30,12 @@ UNIPROTEC. Innovando en capacitación.
 Los clips recibidos son de 478×850 (comprimidos). Se escalan a 1080×1920 con Lanczos, reducción de ruido
 (hqdn3d), nitidez y corrección de color. Con los archivos originales del teléfono la nitidez sería mayor.
 
+## Privacidad: rostros difuminados
+
+`promo.py` detecta los rostros en cada fotograma con YuNet (OpenCV Zoo, licencia Apache-2.0,
+`modelos/face_detection_yunet_2023mar.onnx`) y los difumina con una elipse suave estable en el tiempo.
+Para desactivarlo: `DIFUMINAR_ROSTROS = False`. Umbral de confianza: `UMBRAL`.
+
 ## Generar
 
     python3 promo.py --preview
